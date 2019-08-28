@@ -4,15 +4,33 @@
 #include <Arduino.h>
 #include <Client.h>
 
+#define _FTP_PORT 21
+#define _FTP_TIMEOUT 15000UL
+
 class FTP {
 	public:
 		explicit FTP(Client &cClient, Client &dClient);
 
 	public:
+		int connect(IPAddress ip, uint16_t port);
+		int connect(const char *host, uint16_t port);
 		int connect(IPAddress ip, uint16_t port, const char *user, const char *password = nullptr);
-		inline int connect(IPAddress ip, const char *user, const char *password = nullptr) {
-			return connect(ip, 21, user, password);
+		int connect(const char *host, uint16_t port, const char *user, const char *password = nullptr);
+		inline int connect(IPAddress ip) {
+			return connect(ip, _FTP_PORT);
 		}
+		inline int connect(const char *host) {
+			return connect(host, _FTP_PORT);
+		}
+		inline int connect(IPAddress ip, const char *user, const char *password = nullptr) {
+			return connect(ip, _FTP_PORT, user, password);
+		}
+		inline int connect(const char *host, const char *user, const char *password = nullptr) {
+			return connect(host, _FTP_PORT, user, password);
+		}
+
+		int auth(const char *user, const char *password);
+
 		size_t retrieve(const char *fileName, void *buff, size_t size);
 		size_t store(const char *fileName, const void *buff, size_t size);
 

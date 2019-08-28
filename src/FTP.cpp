@@ -23,12 +23,27 @@ FTP::FTP(Client &cClient, Client &dClient) : cClient(cClient), dClient(dClient) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int FTP::connect(IPAddress ip, uint16_t port, const char *user, const char *password) {
-	if (!user) {
-		return 0;
-	}
+	return connect(ip, port) && auth(user, password);
+}
 
-	cClient.connect(ip, port);
-	if (!cClient.connected()) {
+////////////////////////////////////////////////////////////////////////////////////////////////////
+int FTP::connect(const char *host, uint16_t port, const char *user, const char *password) {
+	return connect(host, port) && auth(user, password);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+int FTP::connect(IPAddress ip, uint16_t port) {
+	return cClient.connect(ip, port) && cClient.connected();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+int FTP::connect(const char *host, uint16_t port) {
+	return cClient.connect(host, port) && cClient.connected();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+int FTP::auth(const char *user, const char *password) {
+	if (!user) {
 		return 0;
 	}
 
@@ -119,7 +134,7 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 
 	uint32_t startTime = millis();
 	uint8_t *ptr = (uint8_t*) buff;
-	while (dClient.connected() && (millis() - startTime < 15000) && (size > 0)) {
+	while (dClient.connected() && (millis() - startTime < _FTP_TIMEOUT) && (size > 0)) {
 		size_t len = dClient.available();
 		if (len > size) {
 			len = size;
@@ -205,7 +220,7 @@ uint16_t FTP::waitServerCode(char *desc) {
 	do {
 		len = cClient.available();
 		delay(1);
-	} while ((len < 4) && (millis() - startTime <= 15000UL));
+	} while ((len < 4) && (millis() - startTime <= _FTP_TIMEOUT));
 
 #if DEBUG
 	Serial.print("< ");
@@ -244,7 +259,7 @@ uint16_t FTP::waitServerCode(char *desc) {
 			}
 			--len;
 		}
-	} while ((millis() - startTime <= 15000UL) && (c != '\n'));
+	} while ((millis() - startTime <= _FTP_TIMEOUT) && (c != '\n'));
 
 	if (desc) {
 		*desc = '\0';
