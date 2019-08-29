@@ -48,19 +48,19 @@ int FTP::auth(const char *user, const char *password) {
 	}
 
 	if (waitServerCode() != 220) {
-		cClient.stop();
+		stop();
 		return 0;
 	}
 
 	switch (waitServerCode(F("USER"), user)) {
 		case 331:
 			if (!password) {
-				cClient.stop();
+				stop();
 				return 0;
 			}
 
 			if (waitServerCode(F("PASS"), password) != 230) {
-				cClient.stop();
+				stop();
 				return 0;
 			}
 			break;
@@ -70,7 +70,7 @@ int FTP::auth(const char *user, const char *password) {
 			break;
 
 		default:
-			cClient.stop();
+			stop();
 			return 0;
 	}
 
@@ -89,6 +89,7 @@ int FTP::beginTransaction() {
 
 	cClient.println(F("PASV"));
 #if DEBUG
+	Serial.print("> ");
 	Serial.println(F("PASV"));
 #endif
 
@@ -128,13 +129,19 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 		return 0;
 	}
 
-	if (waitServerCode(F("RETR"), fileName) != 150) {
-		return 0;
+	int code = waitServerCode(F("RETR"), fileName);
+	switch (code) {
+		case 125: // Data connection already open
+		case 150: // Data connection opened
+			break;
+		default:
+			quit();
+			return 0;
 	}
 
 	uint32_t startTime = millis();
 	uint8_t *ptr = (uint8_t*) buff;
-	while (dClient.connected() && (millis() - startTime < _FTP_TIMEOUT) && (size > 0)) {
+	while ((millis() - startTime < _FTP_TIMEOUT) && (size > 0)) {
 		size_t len = dClient.available();
 		if (len > size) {
 			len = size;
@@ -144,6 +151,8 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 			dClient.read(ptr, len);
 			ptr += len;
 			size -= len;
+		} else if (!dClient.connected()) {
+			break;
 		} else {
 			delay(1);
 		}
@@ -168,8 +177,13 @@ size_t FTP::store(const char *fileName, const void *buff, size_t size) {
 		return 0;
 	}
 
-	if (waitServerCode(F("STOR"), fileName) != 150) {
-		return 0;
+	int code = waitServerCode(F("STOR"), fileName);
+	switch (code) {
+		case 125: // Data connection already open
+		case 150: // Data connection opened
+			break;
+		default:
+			return 0;
 	}
 
 	size_t ret = dClient.write((uint8_t*) buff, size);
@@ -266,4 +280,20 @@ uint16_t FTP::waitServerCode(char *desc) {
 	}
 
 	return code;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void FTP::stop() {
+	if (cClient.connected()) {
+		quit();
+		cClient.stop();
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void FTP::quit() {
+	waitServerCode(F("QUIT"));
+	if (dClient.connected()) {
+		dClient.stop();
+	}
 }

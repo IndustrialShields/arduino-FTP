@@ -31,6 +31,8 @@ class FTP {
 
 		int auth(const char *user, const char *password);
 
+		void stop();
+
 		size_t retrieve(const char *fileName, void *buff, size_t size);
 		size_t store(const char *fileName, const void *buff, size_t size);
 
@@ -39,6 +41,7 @@ class FTP {
 		int waitServerCode(const __FlashStringHelper *cmd, const char *arg, uint16_t response);
 		uint16_t waitServerCode(const __FlashStringHelper *cmd, const char *arg = nullptr, char *desc = nullptr);
 		uint16_t waitServerCode(char *desc = nullptr);
+		void quit();
 
 	private:
 		Client &cClient;
