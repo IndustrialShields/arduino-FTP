@@ -48,19 +48,16 @@ int FTP::auth(const char *user, const char *password) {
 	}
 
 	if (waitServerCode() != 220) {
-		stop();
 		return 0;
 	}
 
 	switch (waitServerCode(F("USER"), user)) {
 		case 331:
 			if (!password) {
-				stop();
 				return 0;
 			}
 
 			if (waitServerCode(F("PASS"), password) != 230) {
-				stop();
 				return 0;
 			}
 			break;
@@ -70,7 +67,6 @@ int FTP::auth(const char *user, const char *password) {
 			break;
 
 		default:
-			stop();
 			return 0;
 	}
 
