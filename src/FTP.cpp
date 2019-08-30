@@ -17,6 +17,11 @@
 
 #include "FTP.h"
 
+#define BUFF_SIZE 64
+
+static char buff[BUFF_SIZE];
+static size_t buffLen = 0;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 FTP::FTP(Client &cClient, Client &dClient) : cClient(cClient), dClient(dClient) {
 }
@@ -125,10 +130,14 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 		return 0;
 	}
 
+	bool alreadyClosed = false;
 	int code = waitServerCode(F("RETR"), fileName);
 	switch (code) {
 		case 125: // Data connection already open
 		case 150: // Data connection opened
+			break;
+		case 226: // Data connection already closed
+			alreadyClosed = true;
 			break;
 		default:
 			quit();
@@ -139,6 +148,11 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 	uint8_t *ptr = (uint8_t*) buff;
 	while ((millis() - startTime < _FTP_TIMEOUT) && (size > 0)) {
 		size_t len = dClient.available();
+		if (len == 0) {
+			if (!dClient.connected()) {
+				break;
+			}
+		}
 		if (len > size) {
 			len = size;
 		}
@@ -147,8 +161,6 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 			dClient.read(ptr, len);
 			ptr += len;
 			size -= len;
-		} else if (!dClient.connected()) {
-			break;
 		} else {
 			delay(1);
 		}
@@ -156,8 +168,10 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 
 	dClient.stop();
 
-	if (waitServerCode() != 226) {
-		return 0;
+	if (alreadyClosed) {
+		if (waitServerCode() != 226) {
+			return 0;
+		}
 	}
 
 	return ptr - (uint8_t *) buff;
@@ -232,44 +246,66 @@ uint16_t FTP::waitServerCode(char *desc) {
 		delay(1);
 	} while ((len < 4) && (millis() - startTime <= _FTP_TIMEOUT));
 
+	if (len == 0) {
+		return 0;
+	}
+
 #if DEBUG
 	Serial.print("< ");
 #endif
 
 	uint16_t code = 0;
-	bool ready = false;
-	char c = '\0';
+	bool codeDone = false;
+	bool descDone = false;
 	do {
 		len = cClient.available();
-		while (len > 0) {
-			c = cClient.read();
+		if (len > 0) {
+			if (len + buffLen > BUFF_SIZE) {
+				len = BUFF_SIZE - buffLen;
+			}
+			buffLen += cClient.read(buff + buffLen, len);
+
+			char *ptr = buff;
+			char c;
+			while (buffLen > 0) {
+				c = *ptr++;
+				--buffLen;
+
+				if (c == '\r') {
 #if DEBUG
-			if (c == '\n') {
-				Serial.print("<NL>");
-				Serial.println();
-			} else if (c == '\r') {
-				Serial.print("<CR>");
-			} else {
-				Serial.write(c);
-			}
+					Serial.print("<CR>");
 #endif
-			if (c == '\r') {
-				// Nothing to do
-			} else if (c == '\n') {
-				break;
-			} else if (!ready) {
-				if (c == ' ') {
-					ready = true;
+					// Nothing to do
+				} else if (c == '\n') {
+#if DEBUG
+					Serial.println("<NL>");
+#endif
+					descDone = true;
+					break;
 				} else {
-					code *= 10;
-					code += c - '0';
+#if DEBUG
+					Serial.print(c);
+#endif
+					if (!codeDone) {
+						if (c == ' ') {
+							codeDone = true;
+						} else {
+							code *= 10;
+							code += c - '0';
+						}
+					} else if (desc) {
+						*desc++ = c;
+					}
 				}
-			} else if (desc) {
-				*desc++ = c;
 			}
-			--len;
+
+			if (buffLen == BUFF_SIZE) {
+				buffLen = 0;
+			} else if (buffLen > 0) {
+				memcpy(buff, ptr, buffLen);
+			}
 		}
-	} while ((millis() - startTime <= _FTP_TIMEOUT) && (c != '\n'));
+	} while ((millis() - startTime <= _FTP_TIMEOUT) && !descDone);
 
 	if (desc) {
 		*desc = '\0';
