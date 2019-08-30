@@ -121,11 +121,7 @@ int FTP::beginTransaction() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
-	if ((buff == nullptr) || (size == 0)) {
-		return 0;
-	}
-
+size_t FTP::retrieve(const char *fileName, Stream &stream) {
 	if (!beginTransaction()) {
 		return 0;
 	}
@@ -145,26 +141,27 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 	}
 
 	uint32_t startTime = millis();
-	uint8_t *ptr = (uint8_t*) buff;
-	while ((millis() - startTime < _FTP_TIMEOUT) && (size > 0)) {
+	uint8_t chunk[_FTP_CHUNK_SIZE];
+	size_t size = 0;
+	do {
 		size_t len = dClient.available();
-		if (len == 0) {
-			if (!dClient.connected()) {
+		if (len > 0) {
+			if (len > _FTP_CHUNK_SIZE) {
+				len = _FTP_CHUNK_SIZE;
+			}
+
+			startTime = millis();
+			len = dClient.read(chunk, len);
+			if (stream.write(chunk, len) == 0) {
 				break;
 			}
-		}
-		if (len > size) {
-			len = size;
-		}
-		if (len > 0) {
-			startTime = millis();
-			dClient.read(ptr, len);
-			ptr += len;
-			size -= len;
+			size += len;
+		} else if (!dClient.connected()) {
+			break;
 		} else {
 			delay(1);
 		}
-	}
+	} while (millis() - startTime < _FTP_TIMEOUT);
 
 	dClient.stop();
 
@@ -174,15 +171,11 @@ size_t FTP::retrieve(const char *fileName, void *buff, size_t size) {
 		}
 	}
 
-	return ptr - (uint8_t *) buff;
+	return size;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-size_t FTP::store(const char *fileName, const void *buff, size_t size) {
-	if ((buff == nullptr) || (size == 0)) {
-		return 0;
-	}
-
+size_t FTP::store(const char *fileName, Stream &stream) {
 	if (!beginTransaction()) {
 		return 0;
 	}
@@ -196,7 +189,22 @@ size_t FTP::store(const char *fileName, const void *buff, size_t size) {
 			return 0;
 	}
 
-	size_t ret = dClient.write((uint8_t*) buff, size);
+	uint8_t chunk[_FTP_CHUNK_SIZE];
+	size_t size = 0;
+	do {
+		size_t len = stream.available();
+		if (len == 0) {
+			break;
+		}
+		if (len > _FTP_CHUNK_SIZE) {
+			len = _FTP_CHUNK_SIZE;
+		}
+		len = stream.readBytes(chunk, len);
+		if (dClient.write(chunk, len) == 0) {
+			break;
+		}
+		size += len;
+	} while (true);
 
 	dClient.stop();
 
@@ -204,7 +212,7 @@ size_t FTP::store(const char *fileName, const void *buff, size_t size) {
 		return 0;
 	}
 
-	return ret;
+	return size;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

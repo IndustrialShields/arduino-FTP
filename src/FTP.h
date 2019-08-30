@@ -6,6 +6,7 @@
 
 #define _FTP_PORT 21
 #define _FTP_TIMEOUT 15000UL
+#define _FTP_CHUNK_SIZE	64
 
 class FTP {
 	public:
@@ -33,8 +34,8 @@ class FTP {
 
 		void stop();
 
-		size_t retrieve(const char *fileName, void *buff, size_t size);
-		size_t store(const char *fileName, const void *buff, size_t size);
+		size_t retrieve(const char *fileName, Stream &stream);
+		size_t store(const char *fileName, Stream &stream);
 
 	private:
 		int beginTransaction();

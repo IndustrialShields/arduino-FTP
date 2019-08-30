@@ -21,15 +21,17 @@ or in case of another TCP port (i.e. 6758):
 ftp.connect(serverIp, 6758, user, password);
 ```
 
-When the connection is ready, it is possible to download files content from the FTP server:
+When the connection is ready, it is possible to download files content from the FTP server to a Stream:
 ```c++
 char fileContent[512];
-ftp.retrieve(fileName, fileContent, 512);
+ftp.retrieve(fileName, stream);
 ```
-or to upload files to the FTP server:
+or to upload files to the FTP server from a Stream:
 ```c++
 const char *fileContent = "This is the new file content";
-ftp.store(fileName, fileContent, strlen(fileContent));
+ftp.store(fileName, stream);
 ```
+
+The `stream` can be any Stream, as Serial, a SD card File, a [BufferStream](https://github.com/IndustrialShields/arduino-BufferStream.git), ...
 
 You can see complete examples in the [examples directory](/examples).

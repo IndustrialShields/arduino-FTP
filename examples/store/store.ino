@@ -9,7 +9,7 @@
 #include <Ethernet.h>
 #endif
 
-uint8_t mac[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 };
+uint8_t mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress ip(10, 10, 10, 6);
 IPAddress namesServer(8, 8, 8, 8);
 IPAddress gateway(10, 10, 10, 1);
@@ -24,7 +24,6 @@ EthernetClient ftpControl;
 EthernetClient ftpData;
 
 FTP ftp(ftpControl, ftpData);
-char data[512] = "This is a store test";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void setup() {
@@ -39,7 +38,13 @@ void setup() {
     while (true);
   }
 
-  ftp.store(fileName, data, strlen(data));
+  Serial.println("You have 10 seconds to write something...");
+  delay(10000UL);
+
+  // Send the written content to the FTP file
+  ftp.store(fileName, Serial);
+
+  Serial.println("The written content is sent to the FTP file");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

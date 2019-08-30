@@ -9,7 +9,7 @@
 #include <Ethernet.h>
 #endif
 
-uint8_t mac[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 };
+uint8_t mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress ip(10, 10, 10, 6);
 IPAddress namesServer(8, 8, 8, 8);
 IPAddress gateway(10, 10, 10, 1);
@@ -24,7 +24,6 @@ EthernetClient ftpControl;
 EthernetClient ftpData;
 
 FTP ftp(ftpControl, ftpData);
-char data[512];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void setup() {
@@ -39,11 +38,13 @@ void setup() {
     while (true);
   }
 
-  size_t len = ftp.retrieve(fileName, data, 512);
-  data[len] = '\0';
+  // Print FTP file content to Serial
+  Serial.println("FTP file content: ");
+  size_t len = ftp.retrieve(fileName, Serial);
 
-  Serial.print("File content: ");
-  Serial.println(data);
+  Serial.println();
+  Serial.print("FTP file size: ");
+  Serial.println(len);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
